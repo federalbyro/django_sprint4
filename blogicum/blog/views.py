@@ -214,4 +214,5 @@ class DeleteCommentView(LoginRequiredMixin,
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        return reverse_lazy('blog:post_detail', kwargs={'pk': self.object.post.pk})
+        return reverse_lazy('blog:post_detail',
+                            kwargs={'pk': self.object.post.pk})

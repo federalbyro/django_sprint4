@@ -10,10 +10,9 @@ urlpatterns = [
          views.CategoryPosts.as_view(), name='category_posts'),
     path('posts/create/', views.CreatePost.as_view(), name='create_post'),
     path('posts/<int:pk>/edit/', views.EditPost.as_view(),
-         name='edit_post'),  # Исправлено имя и параметр
+         name='edit_post'),  
     path('profile/<str:username>/',
          views.ProfileView.as_view(), name='profile'),
-    # Маршрут редактирования профиля
     path('edit_profile/', views.EditProfileView.as_view(),
          name='edit_profile'),
     path('posts/<int:pk>/comment/',

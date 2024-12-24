@@ -27,10 +27,10 @@ class AuthorRequiredMixin(UserPassesTestMixin):
 
 
 class SinglePostObjectMixin:
-    """Миксин для получения поста по pk или post_id."""
+    """Миксин для получения поста по pk или post_pk."""
 
     def get_post(self):
-        post_id = self.kwargs.get('post_id') or self.kwargs.get('pk')
+        post_id = self.kwargs.get('post_pk') or self.kwargs.get('pk')
         return get_object_or_404(Post, pk=post_id)
 
     def get_object(self, queryset=None):
@@ -38,11 +38,11 @@ class SinglePostObjectMixin:
 
 
 class SingleCommentObjectMixin:
-    """Миксин для получения комментария по comment_id и post_id."""
+    """Миксин для получения комментария по comment_pk и post_pk."""
 
     def get_comment(self):
-        comment_id = self.kwargs.get('comment_id')
-        post_id = self.kwargs.get('post_id') or self.kwargs.get('pk')
+        comment_id = self.kwargs.get('comment_pk')
+        post_id = self.kwargs.get('post_pk') or self.kwargs.get('pk')
         return get_object_or_404(Comment, id=comment_id, post__pk=post_id)
 
     def get_object(self, queryset=None):

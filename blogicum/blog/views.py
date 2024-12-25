@@ -48,6 +48,8 @@ def get_paginated_page(request, queryset, per_page=10):
     except EmptyPage:
         paginated_page = paginator.page(paginator.num_pages)
     return paginated_page
+
+
 def annotate_comment_count(queryset):
     """
     Аннотирует переданный QuerySet количеством комментариев для каждого поста.

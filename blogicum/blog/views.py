@@ -29,6 +29,7 @@ SHOWING_FIELDS = [
     'pub_date', 'is_published', 'image'
 ]
 
+
 def get_paginated_page(request, queryset, per_page=10):
     """
     Возвращает объект страницы с пагинацией.
@@ -48,11 +49,13 @@ def get_paginated_page(request, queryset, per_page=10):
         paginated_page = paginator.page(paginator.num_pages)
     return paginated_page
 
+
 def annotate_comment_count(queryset):
     """
     Аннотирует переданный QuerySet количеством комментариев для каждого поста.
     """
     return queryset.annotate(comment_count=Count('comments'))
+
 
 def filter_published_posts(queryset):
     """
@@ -62,6 +65,7 @@ def filter_published_posts(queryset):
     :return: Отфильтрованный QuerySet только с опубликованными постами.
     """
     return queryset.filter(is_published=True, pub_date__lte=now())
+
 
 class Index(ListView):
     """Главная страница блога с списком опубликованных публикаций."""
@@ -88,6 +92,7 @@ class Index(ListView):
         context = super().get_context_data(**kwargs)
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
+
 
 class PostDetail(PostVisibilityMixin, DetailView):
     """Детальная страница публикации с комментариями."""
@@ -118,6 +123,7 @@ class PostDetail(PostVisibilityMixin, DetailView):
             context['form'] = CommentForm()
         return context
 
+
 class CategoryPosts(ListView):
     """Страница со списком публикаций по выбранной категории."""
     model = Category
@@ -141,6 +147,7 @@ class CategoryPosts(ListView):
         context['category'] = self.category
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
+
 
 class ProfileView(ListView):
     """Профиль пользователя с его публикациями."""
@@ -168,6 +175,7 @@ class ProfileView(ListView):
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
 
+
 class CreatePost(LoginRequiredMixin, CreateView):
     """Создание новой публикации."""
     model = Post
@@ -186,8 +194,8 @@ class CreatePost(LoginRequiredMixin, CreateView):
         Перенаправление на профиль 
         пользователя после успешного создания публикации.
         """
-        return reverse_lazy('blog:profile',
-                            kwargs={'username': self.request.user.username})
+        return redirect('blog:profile', username=self.request.user.username)
+
 
 class EditPost(LoginRequiredMixin, AuthorRequiredMixin, UpdateView):
     """Редактирование существующей публикации."""
@@ -201,8 +209,7 @@ class EditPost(LoginRequiredMixin, AuthorRequiredMixin, UpdateView):
         Перенаправление на детальную страницу публикации 
         после успешного редактирования.
         """
-        return reverse_lazy('blog:post_detail',
-                            kwargs={'post_pk': self.object.pk})
+        return redirect('blog:post_detail', post_pk=self.object.pk)
 
     def handle_no_permission(self):
         """
@@ -211,6 +218,7 @@ class EditPost(LoginRequiredMixin, AuthorRequiredMixin, UpdateView):
         """
         post = self.get_object()
         return redirect('blog:post_detail', post_pk=post.pk)
+
 
 class RegistrationView(CreateView):
     """Регистрация нового пользователя."""
@@ -221,8 +229,7 @@ class RegistrationView(CreateView):
         """
         Перенаправление на профиль пользователя после успешной регистрации.
         """
-        return reverse_lazy('blog:profile',
-                            kwargs={'username': self.object.username})
+        return redirect('blog:profile', username=self.object.username)
 
     def form_valid(self, form):
         """
@@ -236,6 +243,7 @@ class RegistrationView(CreateView):
         if user:
             login(self.request, user)
         return response
+
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
     """Редактирование профиля текущего пользователя."""
@@ -253,8 +261,8 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
         """
         Перенаправление на профиль пользователя после успешного редактирования.
         """
-        return reverse_lazy('blog:profile',
-                            kwargs={'username': self.object.username})
+        return redirect('blog:profile', username=self.object.username)
+
 
 class AddCommentView(LoginRequiredMixin, CreateView):
     """Добавление нового комментария к публикации."""
@@ -279,8 +287,8 @@ class AddCommentView(LoginRequiredMixin, CreateView):
         Перенаправление на детальную страницу 
         публикации после успешного добавления комментария.
         """
-        return reverse_lazy('blog:post_detail',
-                            kwargs={'post_pk': self.object.post.pk})
+        return redirect('blog:post_detail', post_pk=self.object.post.pk)
+
 
 class EditCommentView(LoginRequiredMixin,
                       AuthorRequiredMixin,
@@ -297,8 +305,8 @@ class EditCommentView(LoginRequiredMixin,
         Перенаправление на детальную страницу 
         публикации после успешного редактирования комментария.
         """
-        return reverse_lazy('blog:post_detail',
-                            kwargs={'post_pk': self.object.post.pk})
+        return redirect('blog:post_detail', post_pk=self.object.post.pk)
+
 
 class DeletePostView(LoginRequiredMixin,
                      AuthorRequiredMixin,
@@ -314,8 +322,8 @@ class DeletePostView(LoginRequiredMixin,
         Перенаправление на профиль 
         пользователя после успешного удаления публикации.
         """
-        return reverse_lazy('blog:profile',
-                            kwargs={'username': self.request.user.username})
+        return redirect('blog:profile', username=self.request.user.username)
+
 
 class DeleteCommentView(LoginRequiredMixin,
                         AuthorRequiredMixin,
@@ -331,5 +339,4 @@ class DeleteCommentView(LoginRequiredMixin,
         Перенаправление на детальную страницу
         публикации после успешного удаления комментария.
         """
-        return reverse_lazy('blog:post_detail',
-                            kwargs={'post_pk': self.object.post.pk})
+        return redirect('blog:post_detail', post_pk=self.object.post.pk)

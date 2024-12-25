@@ -1,3 +1,4 @@
+# blog/views.py
 from django.http import Http404
 from django.views.generic import (
     DetailView, ListView, CreateView, UpdateView, DeleteView
@@ -9,10 +10,10 @@ from django.utils.timezone import now
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, authenticate, get_user_model
 from django.db.models import Count
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .mixin import (
     PostVisibilityMixin,
     AuthorRequiredMixin,
@@ -27,7 +28,6 @@ SHOWING_FIELDS = [
     'title', 'text', 'category', 'location',
     'pub_date', 'is_published', 'image'
 ]
-
 
 def get_paginated_page(request, queryset, per_page=10):
     """
@@ -48,19 +48,26 @@ def get_paginated_page(request, queryset, per_page=10):
         paginated_page = paginator.page(paginator.num_pages)
     return paginated_page
 
-
 def annotate_comment_count(queryset):
     """
     Аннотирует переданный QuerySet количеством комментариев для каждого поста.
     """
     return queryset.annotate(comment_count=Count('comments'))
 
+def filter_published_posts(queryset):
+    """
+    Фильтрует переданный QuerySet, оставляя только опубликованные посты.
+    
+    :param queryset: Исходный QuerySet постов.
+    :return: Отфильтрованный QuerySet только с опубликованными постами.
+    """
+    return queryset.filter(is_published=True, pub_date__lte=now())
 
 class Index(ListView):
     """Главная страница блога с списком опубликованных публикаций."""
     model = Post
     template_name = 'blog/index.html'
-    paginate_by = 10  # Эта строка теперь не обязательна, так как пагинация обрабатывается функцией
+    paginate_by = 10  # Пагинация обрабатывается функцией
 
     def get_queryset(self):
         """
@@ -68,11 +75,10 @@ class Index(ListView):
         с предварительной выборкой связанных объектов.
         """
         queryset = Post.objects.filter(
-            is_published=True,
-            pub_date__lte=now(),
             category__is_published=True
         ).select_related('category', 'author', 'location').order_by('-pub_date')
         
+        queryset = filter_published_posts(queryset)
         return annotate_comment_count(queryset)
     
     def get_context_data(self, **kwargs):
@@ -82,7 +88,6 @@ class Index(ListView):
         context = super().get_context_data(**kwargs)
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
-
 
 class PostDetail(PostVisibilityMixin, DetailView):
     """Детальная страница публикации с комментариями."""
@@ -113,7 +118,6 @@ class PostDetail(PostVisibilityMixin, DetailView):
             context['form'] = CommentForm()
         return context
 
-
 class CategoryPosts(ListView):
     """Страница со списком публикаций по выбранной категории."""
     model = Category
@@ -127,11 +131,9 @@ class CategoryPosts(ListView):
             slug=self.kwargs['category_slug'],
             is_published=True
         )
-        queryset = self.category.posts.filter(
-            is_published=True,
-            pub_date__lte=now()
-        ).select_related('category', 'author', 'location').order_by('-pub_date')
+        queryset = self.category.posts.select_related('category', 'author', 'location').order_by('-pub_date')
 
+        queryset = filter_published_posts(queryset)
         return annotate_comment_count(queryset)
     
     def get_context_data(self, **kwargs):
@@ -139,7 +141,6 @@ class CategoryPosts(ListView):
         context['category'] = self.category
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
-
 
 class ProfileView(ListView):
     """Профиль пользователя с его публикациями."""
@@ -154,13 +155,14 @@ class ProfileView(ListView):
         )
         queryset = Post.objects.filter(author=self.profile).select_related(
             'category', 'author', 'location'
-        )
+        ).order_by('-pub_date')
         if self.request.user != self.profile:
-            queryset = queryset.filter(is_published=True, pub_date__lte=now())
+            queryset = filter_published_posts(queryset)
 
-        return annotate_comment_count(queryset).order_by('-pub_date')
+        return annotate_comment_count(queryset)
     
     def get_context_data(self, **kwargs):
+        """ Добавляет объект профиля в контекст. """
         context = super().get_context_data(**kwargs)
         context['profile'] = self.profile
         context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
@@ -187,7 +189,6 @@ class CreatePost(LoginRequiredMixin, CreateView):
         return reverse_lazy('blog:profile',
                             kwargs={'username': self.request.user.username})
 
-
 class EditPost(LoginRequiredMixin, AuthorRequiredMixin, UpdateView):
     """Редактирование существующей публикации."""
     model = Post
@@ -210,7 +211,6 @@ class EditPost(LoginRequiredMixin, AuthorRequiredMixin, UpdateView):
         """
         post = self.get_object()
         return redirect('blog:post_detail', post_pk=post.pk)
-
 
 class RegistrationView(CreateView):
     """Регистрация нового пользователя."""
@@ -237,7 +237,6 @@ class RegistrationView(CreateView):
             login(self.request, user)
         return response
 
-
 class EditProfileView(LoginRequiredMixin, UpdateView):
     """Редактирование профиля текущего пользователя."""
     model = User
@@ -256,7 +255,6 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
         """
         return reverse_lazy('blog:profile',
                             kwargs={'username': self.object.username})
-
 
 class AddCommentView(LoginRequiredMixin, CreateView):
     """Добавление нового комментария к публикации."""
@@ -284,7 +282,6 @@ class AddCommentView(LoginRequiredMixin, CreateView):
         return reverse_lazy('blog:post_detail',
                             kwargs={'post_pk': self.object.post.pk})
 
-
 class EditCommentView(LoginRequiredMixin,
                       AuthorRequiredMixin,
                       SingleCommentObjectMixin,
@@ -303,7 +300,6 @@ class EditCommentView(LoginRequiredMixin,
         return reverse_lazy('blog:post_detail',
                             kwargs={'post_pk': self.object.post.pk})
 
-
 class DeletePostView(LoginRequiredMixin,
                      AuthorRequiredMixin,
                      SinglePostObjectMixin,
@@ -320,7 +316,6 @@ class DeletePostView(LoginRequiredMixin,
         """
         return reverse_lazy('blog:profile',
                             kwargs={'username': self.request.user.username})
-
 
 class DeleteCommentView(LoginRequiredMixin,
                         AuthorRequiredMixin,

@@ -1,4 +1,3 @@
-# blog/views.py
 from django.http import Http404
 from django.views.generic import (
     DetailView, ListView, CreateView, UpdateView, DeleteView

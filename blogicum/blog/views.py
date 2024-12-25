@@ -13,6 +13,7 @@ from django.db.models import Count
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .mixin import (
     PostVisibilityMixin,
     AuthorRequiredMixin,
@@ -29,6 +30,24 @@ SHOWING_FIELDS = [
 ]
 
 
+def get_paginated_page(request, queryset, per_page=10):
+    """
+    Возвращает объект страницы с пагинацией.
+    
+    :param request: HttpRequest объект.
+    :param queryset: QuerySet для пагинации.
+    :param per_page: Количество объектов на странице.
+    :return: Объект Page.
+    """
+    paginator = Paginator(queryset, per_page)
+    page = request.GET.get('page')
+    try:
+        paginated_page = paginator.page(page)
+    except PageNotAnInteger:
+        paginated_page = paginator.page(1)
+    except EmptyPage:
+        paginated_page = paginator.page(paginator.num_pages)
+    return paginated_page
 def annotate_comment_count(queryset):
     """
     Аннотирует переданный QuerySet количеством комментариев для каждого поста.
@@ -40,7 +59,7 @@ class Index(ListView):
     """Главная страница блога с списком опубликованных публикаций."""
     model = Post
     template_name = 'blog/index.html'
-    paginate_by = 10
+    paginate_by = 10  # Эта строка теперь не обязательна, так как пагинация обрабатывается функцией
 
     def get_queryset(self):
         """
@@ -52,8 +71,16 @@ class Index(ListView):
             pub_date__lte=now(),
             category__is_published=True
         ).select_related('category', 'author', 'location').order_by('-pub_date')
-
+        
         return annotate_comment_count(queryset)
+    
+    def get_context_data(self, **kwargs):
+        """
+        Добавляет пагинированный набор постов в контекст.
+        """
+        context = super().get_context_data(**kwargs)
+        context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
+        return context
 
 
 class PostDetail(PostVisibilityMixin, DetailView):
@@ -94,10 +121,6 @@ class CategoryPosts(ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        """
-        Получает публикации из выбранной категории.
-        Использует get_object_or_404() для извлечения категории.
-        """
         self.category = get_object_or_404(
             Category,
             slug=self.kwargs['category_slug'],
@@ -109,13 +132,11 @@ class CategoryPosts(ListView):
         ).select_related('category', 'author', 'location').order_by('-pub_date')
 
         return annotate_comment_count(queryset)
-
+    
     def get_context_data(self, **kwargs):
-        """
-        Добавляет объект категории в контекст.
-        """
         context = super().get_context_data(**kwargs)
         context['category'] = self.category
+        context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
 
 
@@ -127,11 +148,6 @@ class ProfileView(ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        """
-        Получает публикации пользователя.
-        Неавторизованный пользователь видит только опубликованные публикации.
-        Использует get_object_or_404() для извлечения пользователя.
-        """
         self.profile = get_object_or_404(
             User, username=self.kwargs['username']
         )
@@ -142,13 +158,12 @@ class ProfileView(ListView):
             queryset = queryset.filter(is_published=True, pub_date__lte=now())
 
         return annotate_comment_count(queryset).order_by('-pub_date')
-
+    
     def get_context_data(self, **kwargs):
-        """ Добавляет объект профиля в контекст. """
         context = super().get_context_data(**kwargs)
         context['profile'] = self.profile
+        context['page_obj'] = get_paginated_page(self.request, self.get_queryset(), self.paginate_by)
         return context
-
 
 class CreatePost(LoginRequiredMixin, CreateView):
     """Создание новой публикации."""
